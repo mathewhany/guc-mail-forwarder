@@ -1,0 +1,61 @@
+name: Build and Push to Docker Hub
+
+on:
+  push:
+    branches:
+      - main
+      
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Get changed microservices
+        id: changed-files
+        uses: tj-actions/changed-files@v43
+        with:
+          files_yaml: |
+            mail_authenticator:
+              - 'mail-authenticator/**'
+            mail_poller:
+              - 'mail-poller/**'
+            mail_forwarder:
+              - 'mail-forwarder/**'
+              
+      - name: Build and push mail-authenticator
+        if: steps.changed-files.outputs.mail_authenticator_any_changed == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: mail-authenticator
+          push: true
+          tags: |
+            mathewhany/guc-mail-authenticator:latest
+            mathewhany/guc-mail-authenticator:${{ github.sha }}
+            
+      - name: Build and push mail-poller
+        if: steps.changed-files.outputs.mail_poller_any_changed == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: mail-poller
+          push: true
+          tags: |
+            mathewhany/guc-mail-poller:latest
+            mathewhany/guc-mail-poller:${{ github.sha }}
+            
+      - name: Build and push mail-forwarder
+        if: steps.changed-files.outputs.mail_forwarder_any_changed == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: mail-forwarder
+          push: true
+          tags: |
+            mathewhany/guc-mail-forwarder:latest
+            mathewhany/guc-mail-forwarder:${{ github.sha }}

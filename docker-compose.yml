@@ -1,0 +1,75 @@
+services:
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+      
+  kafka:
+    image: confluentinc/cp-kafka
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+      
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    ports:
+      - "8082:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+    depends_on:
+      - kafka
+      - zookeeper
+
+  mail_authenticator:
+    build: ./mail-authenticator
+    ports:
+      - "8080:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./mail-authenticator:/app
+      
+  mail_poller:
+    build: ./mail-poller
+    depends_on:
+      - mail_authenticator
+      - redis
+      - kafka
+    environment:
+      - AUTHENTICATOR_URL=http://mail_authenticator:8000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    env_file:
+      - .env
+    volumes:
+      - ./mail-poller:/app
+  
+  mail_forwarder:
+    build: ./mail-forwarder
+    depends_on:
+      - mail_authenticator
+      - redis
+      - kafka
+    environment:
+      - AUTHENTICATOR_URL=http://mail_authenticator:8000
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    env_file:
+      - .env
+    volumes:
+      - ./mail-forwarder:/app
